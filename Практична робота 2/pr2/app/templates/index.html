@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Детекція об'єктів</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        h1 {
+            margin-bottom: 25px;
+        }
+
+        form {
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+        }
+
+        input,
+        button {
+            margin-top: 10px;
+            padding: 8px;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        #result {
+            margin-top: 25px;
+        }
+
+        .error {
+            color: #b00020;
+        }
+
+        .detection {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        img {
+            max-width: 100%;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>Детекція об'єктів</h1>
+
+<form id="form">
+    <div>
+        <label for="image">Зображення:</label>
+        <input
+            type="file"
+            id="image"
+            accept="image/*"
+            required
+        >
+    </div>
+
+    <div>
+        <label for="confidence">
+            Поріг confidence:
+        </label>
+
+        <input
+            type="number"
+            id="confidence"
+            min="0"
+            max="1"
+            step="0.05"
+            value="0.25"
+        >
+    </div>
+
+    <button type="submit">
+        Виконати детекцію
+    </button>
+</form>
+
+<div id="result"></div>
+
+<script>
+    const form = document.getElementById("form");
+    const imageInput = document.getElementById("image");
+    const confidenceInput = document.getElementById("confidence");
+    const result = document.getElementById("result");
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const file = imageInput.files[0];
+
+        if (!file) {
+            result.innerHTML = '<p class="error">Оберіть зображення.</p>';
+            return;
+        }
+
+        const confidence = Number(confidenceInput.value);
+
+        const formData = new FormData();
+        formData.append("image", file);
+
+        result.innerHTML = "<p>Виконується детекція...</p>";
+
+        try {
+            const response = await fetch(
+                `/api/detect?confidence=${confidence}`,
+                {
+                    method: "POST",
+                    body: formData
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                result.innerHTML =
+                    `<p class="error">Помилка: ${data.error}</p>`;
+                return;
+            }
+
+            let html = `
+                <h2>Результат</h2>
+
+                <p>
+                    <strong>Кількість об'єктів:</strong>
+                    ${data.count}
+                </p>
+
+                <p>
+                    <strong>Час inference:</strong>
+                    ${data.inference_time_ms} мс
+                </p>
+
+                <p>
+                    <strong>Поріг confidence:</strong>
+                    ${data.confidence_threshold}
+                </p>
+            `;
+
+            if (data.detections.length === 0) {
+                html += "<p>Об'єктів не знайдено.</p>";
+            } else {
+                html += "<h3>Знайдені об'єкти:</h3>";
+
+                data.detections.forEach((item, index) => {
+                    html += `
+                        <div class="detection">
+                            <strong>${index + 1}. ${item.class}</strong>
+
+                            <p>
+                                Confidence:
+                                ${item.confidence}
+                            </p>
+
+                            <p>
+                                Рамка:
+                                x1=${item.bbox.x1},
+                                y1=${item.bbox.y1},
+                                x2=${item.bbox.x2},
+                                y2=${item.bbox.y2}
+                            </p>
+                        </div>
+                    `;
+                });
+            }
+
+            result.innerHTML = html;
+
+        } catch (error) {
+            result.innerHTML =
+                '<p class="error">Не вдалося виконати запит.</p>';
+        }
+    });
+</script>
+
+</body>
+</html>
